@@ -53,6 +53,7 @@ import java.util.List;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
+// SOL BADGUY
 @TeleOp(name="Debugging", group="Robot")
 public class Debugging extends CenterStage {
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
