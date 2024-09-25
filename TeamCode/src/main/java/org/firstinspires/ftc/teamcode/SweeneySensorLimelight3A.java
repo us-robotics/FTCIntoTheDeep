@@ -117,7 +117,6 @@ public class SweeneySensorLimelight3A extends LinearOpMode {
                     telemetry.addData("tync", result.getTyNC());
 
                     telemetry.addData("Botpose", botpose.toString());
-                    botpose.getOrientation().
 
                     // Access barcode results
                     List<LLResultTypes.BarcodeResult> barcodeResults = result.getBarcodeResults();
