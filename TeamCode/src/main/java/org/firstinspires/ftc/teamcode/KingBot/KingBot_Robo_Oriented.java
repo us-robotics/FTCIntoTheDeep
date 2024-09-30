@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.KingBot;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -6,30 +6,33 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-
-
 // Uses Field Centric Controlling
 // The forward direction is defined as the FORWARD when the bot initializes
-@TeleOp(name = "JohnBot", group = "Linear OpMode")
-public class JohnBot_Robo_Oriented extends LinearOpMode {
+@TeleOp(name = "King Bot (Robo-Oriented)", group = "Linear OpMode")
+public class KingBot_Robo_Oriented extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
+        // Value Variables
+        double flipperPower = 0.7;
+
         // Declare our motors
         // Make sure your ID's match your configuration
 
-        DcMotor frontLeftMotor = hardwareMap.dcMotor.get("LF");
-        DcMotor backLeftMotor = hardwareMap.dcMotor.get("LB");
-        DcMotor frontRightMotor = hardwareMap.dcMotor.get("RF");
-        DcMotor backRightMotor = hardwareMap.dcMotor.get("RB");
+        DcMotor frontLeftMotor = hardwareMap.dcMotor.get("left_front_drive");
+        DcMotor backLeftMotor = hardwareMap.dcMotor.get("left_back_drive");
+        DcMotor frontRightMotor = hardwareMap.dcMotor.get("right_front_drive");
+        DcMotor backRightMotor = hardwareMap.dcMotor.get("right_back_drive");
+        DcMotor flipper = hardwareMap.dcMotor.get("flipper");
 
         // Reverse the right side motors. This may be wrong for your setup.
         // If your robot moves backwards when commanded to go forwards,
         // reverse the left side instead.
         // See the note about this earlier on this page.
+
+
         frontLeftMotor.setDirection(DcMotor.Direction.FORWARD);
-        backLeftMotor.setDirection(DcMotor.Direction.FORWARD);
-        frontRightMotor.setDirection(DcMotor.Direction.REVERSE);
+        backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+        frontRightMotor.setDirection(DcMotor.Direction.FORWARD);
         backRightMotor.setDirection(DcMotor.Direction.REVERSE);
 
         // Retrieve the IMU from the hardware map
@@ -74,6 +77,43 @@ public class JohnBot_Robo_Oriented extends LinearOpMode {
             frontRightMotor.setPower(rightFrontPower);
             backLeftMotor.setPower(leftBackPower);
             backRightMotor.setPower(rightBackPower);
+
+            if (gamepad1.a) {
+                flipper.setPower(flipperPower);
+            } else if (gamepad1.b) {
+                flipper.setPower(-flipperPower);
+            } else {
+                flipper.setPower(0);
+            }
+
+            // Control frontLeftMotor with gamepad1.a
+            if (gamepad1.a) {
+                frontLeftMotor.setPower(1);
+            } else {
+                frontLeftMotor.setPower(0);
+            }
+
+// Control frontRightMotor with gamepad1.b
+            if (gamepad1.b) {
+                frontRightMotor.setPower(1);
+            } else {
+                frontRightMotor.setPower(0);
+            }
+
+// Control backLeftMotor with gamepad1.x
+            if (gamepad1.x) {
+                backLeftMotor.setPower(1);
+            } else {
+                backLeftMotor.setPower(0);
+            }
+
+// Control backRightMotor with gamepad1.y
+            if (gamepad1.y) {
+                backRightMotor.setPower(1);
+            } else {
+                backRightMotor.setPower(0);
+            }
+
         }
     }
 }
