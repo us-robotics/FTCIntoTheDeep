@@ -44,15 +44,18 @@ package org.firstinspires.ftc.teamcode.JohnBot;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 import java.util.List;
@@ -97,9 +100,8 @@ import java.util.List;
  *
  */
 
-@TeleOp(name = "Limelight-Omni Drive To AprilTag", group = "Concept")
-//@Disabled
-public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
+@TeleOp(name = "Spark John", group = "Johnny Boy")
+public class JohnBot_SparkFun extends LinearOpMode {
     // Adjust these numbers to suit your robot.
     final double DESIRED_DISTANCE = 3.0; //  this is how close the camera should get to the target (inches)
 
@@ -107,17 +109,18 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
     //  applied to the drive motors to correct the error.
     //  Drive = Error * Gain    Make these values smaller for smoother control, or larger for a more aggressive response.
     final double SPEED_GAIN = 0.02;   //  Forward Speed Control "Gain". e.g. Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0)
-    final double STRAFE_GAIN = 0.015;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
-    final double TURN_GAIN = 0.01;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
+    final double STRAFE_GAIN = 0.025;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
+    final double TURN_GAIN = 0.05;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
 
     final double MAX_AUTO_SPEED = 0.5;   //  Clip the approach speed to this max value (adjust for your robot)
     final double MAX_AUTO_STRAFE = 0.5;   //  Clip the strafing speed to this max value (adjust for your robot)
-    final double MAX_AUTO_TURN = 0.3;   //  Clip the turn speed to this max value (adjust for your robot)
+    final double MAX_AUTO_TURN = 0.5;   //  Clip the turn speed to this max value (adjust for your robot)
 
     private DcMotor leftFrontDrive = null;  //  Used to control the left front drive wheel
     private DcMotor rightFrontDrive = null;  //  Used to control the right front drive wheel
     private DcMotor leftBackDrive = null;  //  Used to control the left back drive wheel
     private DcMotor rightBackDrive = null;  //  Used to control the right back drive wheel
+    private SparkFunOTOS myOtos = null;
 
     //    private static final boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
     private static final int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
@@ -125,9 +128,7 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
 //    private AprilTagProcessor aprilTag;              // Used for managing the AprilTag detection process.
     private LLResultTypes.FiducialResult desiredTag = null;     // Used to hold the data for a detected AprilTag
 
-
     private Limelight3A limelight;
-
 
     @Override
     public void runOpMode() {
@@ -146,6 +147,20 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
         rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
         leftBackDrive = hardwareMap.get(DcMotor.class, "left_back_drive");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
+
+        myOtos = hardwareMap.get(SparkFunOTOS.class, "sensor_otos");
+
+
+        // Retrieve the IMU from the hardware map
+        IMU imu = hardwareMap.get(IMU.class, "imu");
+        // Adjust the orientation parameters to match your robot
+        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.UP,
+                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+        // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
+        imu.initialize(parameters);
+
+        configureOtos();
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // When run, this OpMode should start both motors driving forward. So adjust these two lines based on your first test drive.
@@ -172,7 +187,7 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
 
         telemetry.setMsTransmissionInterval(11);
 
-        limelight.pipelineSwitch(0);
+        limelight.pipelineSwitch(1);
 
         /*
          * Starts polling for data.  If you neglect to call start(), getLatestResult() will return null.
@@ -185,28 +200,14 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
 
 
         while (opModeIsActive()) {
+            SparkFunOTOS.Pose2D pos = myOtos.getPosition();
 
-            LLStatus status = limelight.getStatus();
-/*
-            telemetry.addData("Name", "%s",
-                    status.getName());
-            telemetry.addData("LL", "Temp: %.1fC, CPU: %.1f%%, FPS: %d",
-                    status.getTemp(), status.getCpu(), (int) status.getFps());
-            telemetry.addData("Pipeline", "Index: %d, Type: %s",
-                    status.getPipelineIndex(), status.getPipelineType());
-*/
             targetFound = false;
             LLResult result = limelight.getLatestResult();
             Pose3D botpose = null;
             if (result != null) {
                 // Access general information
                 botpose = result.getBotpose();
-                double captureLatency = result.getCaptureLatency();
-                double targetingLatency = result.getTargetingLatency();
-                double parseLatency = result.getParseLatency();
-/*                telemetry.addData("LL Latency", captureLatency + targetingLatency);
-                telemetry.addData("Parse Latency", parseLatency);
-                telemetry.addData("PythonOutput", java.util.Arrays.toString(result.getPythonOutput()));*/
 
                 if (result.isValid()) {
                     telemetry.addData("tx", result.getTx());
@@ -216,9 +217,7 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
 
                     telemetry.addData("Botpose", botpose.toString());
 
-
                     desiredTag = null;
-
 
                     // Access fiducial results
                     List<LLResultTypes.FiducialResult> fiducialResults = result.getFiducialResults();
@@ -242,10 +241,6 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
                 telemetry.addData("Limelight", "No data available");
             }
 
-
-            double x = 0;
-            double y = 0;
-            double z = 0;
             double yaw = 0;
             double range = 0;
             double bearing = 0;
@@ -256,15 +251,19 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
                 telemetry.addData("Found", "ID %d (%s)", desiredTag.getFiducialId(), desiredTag.getFamily());
 
                 YawPitchRollAngles targetOrientation = desiredTag.getRobotPoseTargetSpace().getOrientation();
+                Pose3D targetPose = desiredTag.getRobotPoseTargetSpace();
                 YawPitchRollAngles orientation = botpose.getOrientation();
                 range = 100-result.getTa();
-                yaw = orientation.getYaw();
+                //yaw = orientation.getYaw();
+                yaw = imu.getRobotYawPitchRollAngles().getYaw();
                 bearing = -desiredTag.getTargetXDegrees();
 
-                telemetry.addData("Data (Target)", "X: %.2f, Y: %.2f, Z: %.2f", result.getTx(), result.getTy(), result.getTa());
+                telemetry.addData("Pose (Target)", "X: %.2f, Y: %.2f, Z: %.2f", targetPose.getPosition().x, targetPose.getPosition().y, targetPose.getPosition().z);
+                telemetry.addData("Orientation (Target)", "X: %.2f, Y: %.2f, Z: %.2f", result.getTx(), result.getTy(), result.getTa());
                 telemetry.addData("Range", "%5.1f inches", range);
                 telemetry.addData("Bearing", "%3.0f degrees", bearing);
                 telemetry.addData("Yaw", "%3.0f degrees", yaw);
+                telemetry.addData("Skew", "%3.0f degrees", desiredTag.getSkew());
             } else {
                 telemetry.addData("\n>", "Drive using joysticks to find valid target\n");
             }
@@ -275,7 +274,8 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
                 // Determine heading, range and Yaw (tag image rotation) error so we can use them to control the robot automatically.
                 double rangeError = (range - DESIRED_DISTANCE);
                 double headingError = bearing;
-                double yawError = yaw;
+                // double yawError = yaw;
+                double yawError = desiredTag.getSkew() - yaw;
 
                 // Use the speed and turn "gains" to calculate how we want the robot to move.
                 drive = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED);
@@ -290,7 +290,21 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
                 strafe = -gamepad1.left_stick_x / 2.0;  // Reduce strafe rate to 50%.
                 turn = -gamepad1.right_stick_x / 3.0;  // Reduce turn rate to 33%.
                 telemetry.addData("Manual", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
+
+                // Reset the tracking if the user requests it
+                if (gamepad1.options) {
+                    myOtos.resetTracking();
+                }
+                if (gamepad1.start) {
+                    myOtos.calibrateImu();
+                }
+
             }
+
+            telemetry.addData("X coordinate", pos.x);
+            telemetry.addData("Y coordinate", pos.y);
+            telemetry.addData("Heading angle", pos.h);
+
             telemetry.update();
 
             // Apply desired axes motions to the drivetrain.
@@ -343,72 +357,96 @@ public class SweeneyDriveToAprilTagOmniLimeLight extends LinearOpMode {
         leftBackDrive.setPower(leftBackPower);
         rightBackDrive.setPower(rightBackPower);
     }
+
+    public void calculateAprilTagOffset() {
+
+    }
+
+    public void recalibrateWithAprilTag() {
+
+    }
+
+    private void configureOtos() {
+        telemetry.addLine("Configuring OTOS...");
+        telemetry.update();
+
+        // Set the desired units for linear and angular measurements. Can be either
+        // meters or inches for linear, and radians or degrees for angular. If not
+        // set, the default is inches and degrees. Note that this setting is not
+        // persisted in the sensor, so you need to set at the start of all your
+        // OpModes if using the non-default value.
+        // myOtos.setLinearUnit(DistanceUnit.METER);
+        myOtos.setLinearUnit(DistanceUnit.INCH);
+        // myOtos.setAngularUnit(AnguleUnit.RADIANS);
+        myOtos.setAngularUnit(AngleUnit.DEGREES);
+
+        // Assuming you've mounted your sensor to a robot and it's not centered,
+        // you can specify the offset for the sensor relative to the center of the
+        // robot. The units default to inches and degrees, but if you want to use
+        // different units, specify them before setting the offset! Note that as of
+        // firmware version 1.0, these values will be lost after a power cycle, so
+        // you will need to set them each time you power up the sensor. For example, if
+        // the sensor is mounted 5 inches to the left (negative X) and 10 inches
+        // forward (positive Y) of the center of the robot, and mounted 90 degrees
+        // clockwise (negative rotation) from the robot's orientation, the offset
+        // would be {-5, 10, -90}. These can be any value, even the angle can be
+        // tweaked slightly to compensate for imperfect mounting (eg. 1.3 degrees).
+        SparkFunOTOS.Pose2D offset = new SparkFunOTOS.Pose2D(4.5, 0, 0);
+        myOtos.setOffset(offset);
+
+        // Here we can set the linear and angular scalars, which can compensate for
+        // scaling issues with the sensor measurements. Note that as of firmware
+        // version 1.0, these values will be lost after a power cycle, so you will
+        // need to set them each time you power up the sensor. They can be any value
+        // from 0.872 to 1.127 in increments of 0.001 (0.1%). It is recommended to
+        // first set both scalars to 1.0, then calibrate the angular scalar, then
+        // the linear scalar. To calibrate the angular scalar, spin the robot by
+        // multiple rotations (eg. 10) to get a precise error, then set the scalar
+        // to the inverse of the error. Remember that the angle wraps from -180 to
+        // 180 degrees, so for example, if after 10 rotations counterclockwise
+        // (positive rotation), the sensor reports -15 degrees, the required scalar
+        // would be 3600/3585 = 1.004. To calibrate the linear scalar, move the
+        // robot a known distance and measure the error; do this multiple times at
+        // multiple speeds to get an average, then set the linear scalar to the
+        // inverse of the error. For example, if you move the robot 100 inches and
+        // the sensor reports 103 inches, set the linear scalar to 100/103 = 0.971
+        myOtos.setLinearScalar(1.0);
+        myOtos.setAngularScalar(1.0);
+
+        // The IMU on the OTOS includes a gyroscope and accelerometer, which could
+        // have an offset. Note that as of firmware version 1.0, the calibration
+        // will be lost after a power cycle; the OTOS performs a quick calibration
+        // when it powers up, but it is recommended to perform a more thorough
+        // calibration at the start of all your OpModes. Note that the sensor must
+        // be completely stationary and flat during calibration! When calling
+        // calibrateImu(), you can specify the number of samples to take and whether
+        // to wait until the calibration is complete. If no parameters are provided,
+        // it will take 255 samples and wait until done; each sample takes about
+        // 2.4ms, so about 612ms total
+        myOtos.calibrateImu();
+
+        // Reset the tracking algorithm - this resets the position to the origin,
+        // but can also be used to recover from some rare tracking errors
+        myOtos.resetTracking();
+
+        // After resetting the tracking, the OTOS will report that the robot is at
+        // the origin. If your robot does not start at the origin, or you have
+        // another source of location information (eg. vision odometry), you can set
+        // the OTOS location to match and it will continue to track from there.
+        SparkFunOTOS.Pose2D currentPosition = new SparkFunOTOS.Pose2D(0, 0, 0);
+        myOtos.setPosition(currentPosition);
+
+        // Get the hardware and firmware version
+        SparkFunOTOS.Version hwVersion = new SparkFunOTOS.Version();
+        SparkFunOTOS.Version fwVersion = new SparkFunOTOS.Version();
+        myOtos.getVersionInfo(hwVersion, fwVersion);
+
+        telemetry.addLine("OTOS configured! Press start to get position data!");
+        telemetry.addLine();
+        telemetry.addLine(String.format("OTOS Hardware Version: v%d.%d", hwVersion.major, hwVersion.minor));
+        telemetry.addLine(String.format("OTOS Firmware Version: v%d.%d", fwVersion.major, fwVersion.minor));
+        telemetry.update();
+    }
 }
 
-///**
-// * Initialize the AprilTag processor.
-// */
-//private void initAprilTag() {
-//    // Create the AprilTag processor by using a builder.
-//    aprilTag = new AprilTagProcessor.Builder().build();
-//
-//    // Adjust Image Decimation to trade-off detection-range for detection-rate.
-//    // e.g. Some typical detection data using a Logitech C920 WebCam
-//    // Decimation = 1 ..  Detect 2" Tag from 10 feet away at 10 Frames per second
-//    // Decimation = 2 ..  Detect 2" Tag from 6  feet away at 22 Frames per second
-//    // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second
-//    // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second
-//    // Note: Decimation can be changed on-the-fly to adapt during a match.
-//    aprilTag.setDecimation(2);
-//
-//    // Create the vision portal by using a builder.
-//    if (USE_WEBCAM) {
-//        visionPortal = new VisionPortal.Builder()
-//                .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
-//                .addProcessor(aprilTag)
-//                .build();
-//    } else {
-//        visionPortal = new VisionPortal.Builder()
-//                .setCamera(BuiltinCameraDirection.BACK)
-//                .addProcessor(aprilTag)
-//                .build();
-//    }
-//}
 
-///*
-// Manually set the camera gain and exposure.
-// This can only be called AFTER calling initAprilTag(), and only works for Webcams;
-//*/
-//private void    setManualExposure(int exposureMS, int gain) {
-//    // Wait for the camera to be open, then use the controls
-//
-//    if (visionPortal == null) {
-//        return;
-//    }
-//
-//    // Make sure camera is streaming before we try to set the exposure controls
-//    if (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING) {
-//        telemetry.addData("Camera", "Waiting");
-//        telemetry.update();
-//        while (!isStopRequested() && (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING)) {
-//            sleep(20);
-//        }
-//        telemetry.addData("Camera", "Ready");
-//        telemetry.update();
-//    }
-//
-//    // Set camera controls unless we are stopping.
-//    if (!isStopRequested())
-//    {
-//        ExposureControl exposureControl = visionPortal.getCameraControl(ExposureControl.class);
-//        if (exposureControl.getMode() != ExposureControl.Mode.Manual) {
-//            exposureControl.setMode(ExposureControl.Mode.Manual);
-//            sleep(50);
-//        }
-//        exposureControl.setExposure((long)exposureMS, TimeUnit.MILLISECONDS);
-//        sleep(20);
-//        GainControl gainControl = visionPortal.getCameraControl(GainControl.class);
-//        gainControl.setGain(gain);
-//        sleep(20);
-//    }
-//}

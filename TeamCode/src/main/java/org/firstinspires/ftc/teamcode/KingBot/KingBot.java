@@ -14,6 +14,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 public class KingBot extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
+        final double VERT_ENCODER_RESOLUTION = 537.7;
+        final double VERT_GEAR_RADIUS = 3.82; // cm
+        final double CM_TO_ENCODER_FACTOR = VERT_ENCODER_RESOLUTION/(2*Math.PI * VERT_GEAR_RADIUS); // cm * THIS = encoder position
+        final double FULL_EXTENT_VERT_CM = 30;
+        final int FULL_EXTENT_VERT_ENCODERS = (int) (FULL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
+        final int MIN_EXTENT_VERT_ENCODERS = 0;
+        final double VERT_POWER = 0.5;
+
         // Value Variables
         double flipperPower = 0.35;
         double intakePower = 1.0;
@@ -27,6 +35,7 @@ public class KingBot extends LinearOpMode {
         DcMotor backRightMotor = hardwareMap.dcMotor.get("right_back_drive");
         DcMotor flipper = hardwareMap.dcMotor.get("flipper");
         DcMotor intake = hardwareMap.dcMotor.get("intake");
+        DcMotor vertSlide = hardwareMap.dcMotor.get("vert");
 
         // Reverse the right side motors. This may be wrong for your setup.
         // If your robot moves backwards when commanded to go forwards,
@@ -36,6 +45,9 @@ public class KingBot extends LinearOpMode {
         backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
         frontRightMotor.setDirection(DcMotor.Direction.FORWARD);
         backRightMotor.setDirection(DcMotor.Direction.REVERSE);
+
+        // ENCODERS
+        vertSlide.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // Retrieve the IMU from the hardware map
         IMU imu = hardwareMap.get(IMU.class, "imu");
@@ -101,6 +113,24 @@ public class KingBot extends LinearOpMode {
                 intake.setPower(0);
             }
 
+            if (gamepad1.y) {
+                runMotorToEncoderPosition(vertSlide, FULL_EXTENT_VERT_ENCODERS, VERT_POWER);
+            }
+            if (gamepad1.y)
+            {
+                runMotorToEncoderPosition(vertSlide, MIN_EXTENT_VERT_ENCODERS, -VERT_POWER);
+            }
+
         }
+
+    }
+    public void runMotorToEncoderPosition(DcMotor motor, int position, double power) {
+        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        motor.setTargetPosition(position);
+        motor.setPower(power);
+        while (motor.isBusy() && opModeIsActive()) {
+
+        }
+        motor.setPower(0);
     }
 }
