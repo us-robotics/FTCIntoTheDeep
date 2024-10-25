@@ -47,6 +47,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -103,6 +104,7 @@ import java.util.List;
  */
 
 @TeleOp(name = "JohnBot Mock Auto", group = "Johnny Boy")
+@Disabled
 public class JohnBot_MockAuto extends LinearOpMode {
     // Adjust these numbers to suit your robot.
     final double DESIRED_DISTANCE = 3.0; //  this is how close the camera should get to the target (inches)

@@ -12,8 +12,24 @@ import com.qualcomm.robotcore.hardware.IMU;
 public class KingBot_Robo_Oriented extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
+        final double VERT_ENCODER_RESOLUTION = 537.7;
+        final double VERT_GEAR_RADIUS = 3.82; // cm
+        final double CM_TO_ENCODER_FACTOR = VERT_ENCODER_RESOLUTION/(2*Math.PI * VERT_GEAR_RADIUS); // cm * THIS = encoder position
+
+        final double FULL_EXTENT_VERT_CM = 30;
+        final int FULL_EXTENT_VERT_ENCODERS = (int) (FULL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
+        final int MIN_EXTENT_VERT_ENCODERS = 0;
+        final double VERT_POWER = 0.5;
+
+        final double FULL_EXTENT_HORI_CM = 25;
+        final int FULL_EXTENT_HORI_ENCODERS = (int) (FULL_EXTENT_HORI_CM * CM_TO_ENCODER_FACTOR);
+        final int MIN_EXTENT_HORI_ENCODERS = 0;
+        final double HORI_POWER = 0.5;
+
         // Value Variables
-        double flipperPower = 0.7;
+        double flipperPower = 0.5;
+        double intakePower = 1.0;
+
 
         // Declare our motors
         // Make sure your ID's match your configuration
@@ -23,6 +39,9 @@ public class KingBot_Robo_Oriented extends LinearOpMode {
         DcMotor frontRightMotor = hardwareMap.dcMotor.get("right_front_drive");
         DcMotor backRightMotor = hardwareMap.dcMotor.get("right_back_drive");
         DcMotor flipper = hardwareMap.dcMotor.get("flipper");
+        DcMotor intake = hardwareMap.dcMotor.get("intake");
+        DcMotor vertSlide = hardwareMap.dcMotor.get("vert");
+        DcMotor horiSlide = hardwareMap.dcMotor.get("hori");
 
         // Reverse the right side motors. This may be wrong for your setup.
         // If your robot moves backwards when commanded to go forwards,
@@ -51,9 +70,9 @@ public class KingBot_Robo_Oriented extends LinearOpMode {
         while (opModeIsActive()) {
             double max;
 
-            double axial = gamepad1.left_stick_y;
-            double lateral = -gamepad1.left_stick_x;
-            double yaw = -gamepad1.right_stick_x;
+            double axial = -gamepad1.left_stick_y;
+            double lateral = gamepad1.left_stick_x;
+            double yaw = gamepad1.right_stick_x;
 
             double leftFrontPower  = axial + lateral + yaw;
             double rightFrontPower = axial - lateral - yaw;
@@ -78,42 +97,59 @@ public class KingBot_Robo_Oriented extends LinearOpMode {
             backLeftMotor.setPower(leftBackPower);
             backRightMotor.setPower(rightBackPower);
 
-            if (gamepad1.a) {
+
+            /**
+             * MOTORS
+             * **/
+            double vert_power = gamepad2.right_stick_y;
+            vertSlide.setPower(vert_power);
+
+            double hori_power = gamepad2.left_stick_x;
+            horiSlide.setPower(hori_power);
+
+            intake.setPower((gamepad2.right_trigger - gamepad2.left_trigger) * intakePower);
+
+            /**
+             * SERVOS
+             * **/
+            if (gamepad2.left_bumper) {
                 flipper.setPower(flipperPower);
-            } else if (gamepad1.b) {
+            } else if (gamepad2.right_bumper) {
                 flipper.setPower(-flipperPower);
             } else {
                 flipper.setPower(0);
             }
 
-            // Control frontLeftMotor with gamepad1.a
-            if (gamepad1.a) {
-                frontLeftMotor.setPower(1);
-            } else {
-                frontLeftMotor.setPower(0);
+            /**
+             * ENCODERS
+             * **/
+/*            if (gamepad2.y) {
+                runMotorToEncoderPosition(vertSlide, FULL_EXTENT_VERT_ENCODERS, VERT_POWER);
             }
+            else if (gamepad2.b)
+            {
+                runMotorToEncoderPosition(vertSlide, MIN_EXTENT_VERT_ENCODERS, -VERT_POWER);
+            }*/
 
-// Control frontRightMotor with gamepad1.b
-            if (gamepad1.b) {
-                frontRightMotor.setPower(1);
-            } else {
-                frontRightMotor.setPower(0);
+            if (gamepad2.x) {
+                runMotorToEncoderPosition(horiSlide, -FULL_EXTENT_HORI_ENCODERS, -HORI_POWER);
             }
-
-// Control backLeftMotor with gamepad1.x
-            if (gamepad1.x) {
-                backLeftMotor.setPower(1);
-            } else {
-                backLeftMotor.setPower(0);
-            }
-
-// Control backRightMotor with gamepad1.y
-            if (gamepad1.y) {
-                backRightMotor.setPower(1);
-            } else {
-                backRightMotor.setPower(0);
+            if (gamepad2.a)
+            {
+                runMotorToEncoderPosition(horiSlide, MIN_EXTENT_HORI_ENCODERS, HORI_POWER);
             }
 
         }
+    }
+    public void runMotorToEncoderPosition(DcMotor motor, int position, double power) {
+        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        motor.setTargetPosition(position);
+        motor.setPower(power);
+        while (motor.isBusy() && opModeIsActive()) {
+            telemetry.addData("Name: ", motor.getPortNumber());
+            telemetry.addData("Pos: ", motor.getCurrentPosition());
+            telemetry.update();
+        }
+        motor.setPower(0);
     }
 }

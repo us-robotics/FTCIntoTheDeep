@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -11,16 +12,18 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 // Uses Field Centric Controlling
 // The forward direction is defined as the FORWARD when the bot initializes
 @TeleOp(name = "Prüfung (Test)", group = "Linear OpMode")
+@Disabled
 public class Prüfung extends LinearOpMode {
+    final double VERT_ENCODER_RESOLUTION = 384.5; // 5203 Series Yellow Jacket Planetary Gear Motor (19.2:1)
+    final double VERT_GEAR_RADIUS = 3.82; // cm
+    final double CM_TO_ENCODER_FACTOR = VERT_ENCODER_RESOLUTION/(Math.PI * VERT_GEAR_RADIUS); // cm * THIS = encoder position
+    final double FULL_EXTENT_VERT_CM = 50;
+    final int FULL_EXTENT_VERT_ENCODERS = (int) (FULL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
+    final int MIN_EXTENT_VERT_ENCODERS = 0;
+    final double VERT_POWER = 0.3;
+
     @Override
     public void runOpMode() throws InterruptedException {
-        final double VERT_ENCODER_RESOLUTION = 384.5;
-        final double VERT_GEAR_RADIUS = 3.82; // cm
-        final double CM_TO_ENCODER_FACTOR = VERT_ENCODER_RESOLUTION/(2*Math.PI * VERT_GEAR_RADIUS); // cm * THIS = encoder position
-        final double FULL_EXTENT_VERT_CM = 100;
-        final int FULL_EXTENT_VERT_ENCODERS = (int) (FULL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
-        final int MIN_EXTENT_VERT_ENCODERS = 0;
-        final double VERT_POWER = 0.3;
 
         // Value Variables
 
@@ -65,5 +68,14 @@ public class Prüfung extends LinearOpMode {
         }
         motor.setPower(0);
         motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+
+    /**
+     * Convert real units (cm) into encoder position
+     * @param cm
+     * @return
+     */
+    public int distanceToEncoder(double cm) {
+        return (int) (cm * CM_TO_ENCODER_FACTOR);
     }
 }
