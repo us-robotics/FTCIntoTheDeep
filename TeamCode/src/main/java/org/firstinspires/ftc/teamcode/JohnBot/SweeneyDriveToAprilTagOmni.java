@@ -34,6 +34,7 @@
 
 package org.firstinspires.ftc.teamcode.JohnBot;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -91,7 +92,7 @@ import java.util.concurrent.TimeUnit;
  */
 
 @TeleOp(name="Omni Drive To AprilTag", group = "Concept")
-//@Disabled
+@Disabled
 public class SweeneyDriveToAprilTagOmni extends LinearOpMode
 {
     // Adjust these numbers to suit your robot.

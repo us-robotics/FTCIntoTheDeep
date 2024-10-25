@@ -31,6 +31,7 @@ package org.firstinspires.ftc.teamcode.JohnBot;
 
 import android.annotation.SuppressLint;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
@@ -54,6 +55,7 @@ import java.util.List;
  */
 
 @TeleOp(name="Debugging", group="Robot")
+@Disabled
 public class Debugging extends CenterStage {
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
     private AprilTagProcessor aprilTag;
