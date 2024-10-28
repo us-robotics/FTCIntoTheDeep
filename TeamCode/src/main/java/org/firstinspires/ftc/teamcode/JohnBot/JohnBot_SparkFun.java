@@ -310,7 +310,6 @@ public class JohnBot_SparkFun extends LinearOpMode {
                 if (gamepad1.start) {
                     myOtos.calibrateImu();
                 }
-
             }
 
             telemetry.addLine("Spark My Fun Fr Fr");

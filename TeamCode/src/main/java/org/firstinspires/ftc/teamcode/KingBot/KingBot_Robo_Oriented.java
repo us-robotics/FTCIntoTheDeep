@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.KingBot;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -9,6 +10,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 // Uses Field Centric Controlling
 // The forward direction is defined as the FORWARD when the bot initializes
 @TeleOp(name = "King Bot (Robo-Oriented)", group = "Linear OpMode")
+@Disabled
 public class KingBot_Robo_Oriented extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
