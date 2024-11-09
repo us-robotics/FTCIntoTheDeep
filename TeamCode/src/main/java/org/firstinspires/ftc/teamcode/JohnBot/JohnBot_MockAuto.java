@@ -42,26 +42,19 @@ package org.firstinspires.ftc.teamcode.JohnBot;
  */
 
 
-import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.robotcore.external.navigation.Position;
-import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
-import org.opencv.core.Point3;
-
-import java.util.List;
+import org.firstinspires.ftc.teamcode.NMath;
+import org.firstinspires.ftc.teamcode.Vec3;
 
 /*
  * This OpMode illustrates using a camera to locate and drive towards a specific AprilTag.
@@ -103,8 +96,7 @@ import java.util.List;
  *
  */
 
-@TeleOp(name = "JohnBot Mock Auto", group = "Johnny Boy")
-@Disabled
+@TeleOp(name = "JohnBot Mock Auto", group = "Linear Opmode")
 public class JohnBot_MockAuto extends LinearOpMode {
     // Adjust these numbers to suit your robot.
     final double DESIRED_DISTANCE = 3.0; //  this is how close the camera should get to the target (inches)
@@ -120,6 +112,10 @@ public class JohnBot_MockAuto extends LinearOpMode {
     final double MAX_AUTO_STRAFE = 0.5;   //  Clip the strafing speed to this max value (adjust for your robot)
     final double MAX_AUTO_TURN = 0.5;   //  Clip the turn speed to this max value (adjust for your robot)
 
+    final double DRIVE_TO_SPEED_MOD = 0.4;
+
+    final double vectorTolerance = 1; // How close a vectors components must be to be considered equal
+
     private DcMotor leftFrontDrive = null;  //  Used to control the left front drive wheel
     private DcMotor rightFrontDrive = null;  //  Used to control the right front drive wheel
     private DcMotor leftBackDrive = null;  //  Used to control the left back drive wheel
@@ -133,6 +129,12 @@ public class JohnBot_MockAuto extends LinearOpMode {
     private LLResultTypes.FiducialResult desiredTag = null;     // Used to hold the data for a detected AprilTag
 
     private Limelight3A limelight;
+
+    IMU imu = null;
+
+    // AUTO POSITIONS
+    final double PARK_X = 20;
+    final double PARK_Y = 45;
 
     @Override
     public void runOpMode() {
@@ -156,7 +158,7 @@ public class JohnBot_MockAuto extends LinearOpMode {
 
 
         // Retrieve the IMU from the hardware map
-        IMU imu = hardwareMap.get(IMU.class, "imu");
+        imu = hardwareMap.get(IMU.class, "imu");
         // Adjust the orientation parameters to match your robot
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
@@ -192,10 +194,20 @@ public class JohnBot_MockAuto extends LinearOpMode {
         telemetry.update();
         waitForStart();
 
-        SparkFunOTOS.Pose2D pos = myOtos.getPosition();
-
-        SparkFunOTOS.Pose2D target = new SparkFunOTOS.Pose2D(2, 0, 0);
+        Vec3 target = new Vec3(PARK_X, 0, 0);
         driveToPoint(target);
+
+        sleep(5000);
+
+        target = new Vec3(PARK_X, PARK_Y, 0);
+        driveToPoint(target);
+
+        sleep(5000);
+
+        target = new Vec3(5, PARK_Y, 0);
+        driveToPoint(target);
+
+        SparkFunOTOS.Pose2D pos = myOtos.getPosition();
 
         telemetry.addData("X coordinate", pos.x);
         telemetry.addData("Y coordinate", pos.y);
@@ -203,35 +215,6 @@ public class JohnBot_MockAuto extends LinearOpMode {
 
         limelight.stop();
 
-    }
-
-    public void driveToPoint(SparkFunOTOS.Pose2D target) {
-
-        SparkFunOTOS.Pose2D pos = myOtos.getPosition();
-        while (!pos.equals(target)) {
-            pos = myOtos.getPosition();
-            SparkFunOTOS.Pose2D directionVector = new SparkFunOTOS.Pose2D(target.x - pos.x, target.y - pos.y, 0);
-
-            double[] data = normalizeDirection(directionVector);
-            double drive = data[0];
-            double strafe = data[1];
-            moveRobot(drive, strafe, 0);
-
-            pos = myOtos.getPosition();
-            telemetry.addData("X coordinate", pos.x);
-            telemetry.addData("Y coordinate", pos.y);
-            telemetry.addData("Heading angle", pos.h);
-            telemetry.addData("Target", "X %5.2f, Y %5.2f", data[0], data[1]);
-            telemetry.update();
-            sleep(10);
-
-        }
-
-    }
-
-    public double[] normalizeDirection(SparkFunOTOS.Pose2D vec) {
-        double length = Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
-        return new double[] {vec.x/length, vec.y/length};
     }
 
     /**
@@ -277,6 +260,107 @@ public class JohnBot_MockAuto extends LinearOpMode {
         rightBackDrive.setPower(rightBackPower);
     }
 
+    /**
+     * Move robot according to desired axes motions for field oriented
+     * <p>
+     * Positive X is forward
+     * <p>
+     * Positive Y is strafe left
+     * <p>
+     * Positive Yaw is counter-clockwise
+     */
+    public void moveRobotAbsolute(double x, double y, double rx) {
+        // Calculate wheel powers.
+
+        double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+
+        // Rotate the movement direction counter to the bot's rotation
+        double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+        double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+
+        //rotX = rotX * 1.1;  // Counteract imperfect strafing
+
+        // Denominator is the largest motor power (absolute value) or 1
+        // This ensures all the powers maintain the same ratio,
+        // but only if at least one is out of the range [-1, 1]
+        double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
+        double frontLeftPower = (rotY + rotX + rx) / denominator;
+        double backLeftPower = (rotY - rotX + rx) / denominator;
+        double frontRightPower = (rotY - rotX - rx) / denominator;
+        double backRightPower = (rotY + rotX - rx) / denominator;
+
+        /**
+         * SWEENEY MODIFICATION
+         */
+        frontLeftPower *= -1;
+        frontRightPower *= -1;
+        backLeftPower *= -1;
+        backRightPower *= -1;
+
+        // Normalize wheel powers to be less than 1.0
+        double max = Math.max(Math.abs(frontLeftPower), Math.abs(frontRightPower));
+        max = Math.max(max, Math.abs(backLeftPower));
+        max = Math.max(max, Math.abs(backRightPower));
+
+        if (max > 1.0) {
+            frontLeftPower /= max;
+            frontRightPower /= max;
+            backLeftPower /= max;
+            backRightPower /= max;
+        }
+
+        // Send powers to the wheels.
+        leftFrontDrive.setPower(frontLeftPower);
+        rightFrontDrive.setPower(frontRightPower);
+        leftBackDrive.setPower(backLeftPower);
+        rightBackDrive.setPower(backRightPower);
+    }
+
+    public void driveToPoint(Vec3 target) {
+
+        SparkFunOTOS.Pose2D posOtos = myOtos.getPosition();
+        Vec3 pos = new Vec3(posOtos.x, posOtos.y, posOtos.h);
+        while (!tolerancePointCompare(pos, target, vectorTolerance)) {
+            if (gamepad1.y) {
+                break;
+            }
+
+            posOtos = myOtos.getPosition();
+            pos = new Vec3(posOtos.x, posOtos.y, posOtos.h);
+            Vec3 directionVector = NMath.Subtract(target, pos);
+
+            double[] data = normalizeDirection(directionVector);
+            double drive = data[0] * DRIVE_TO_SPEED_MOD;
+            double strafe = -data[1] * DRIVE_TO_SPEED_MOD;
+            double turn = data[2] * DRIVE_TO_SPEED_MOD;
+            moveRobotAbsolute(strafe, drive, turn);
+
+            posOtos = myOtos.getPosition();
+            pos = new Vec3(posOtos.x, posOtos.y, posOtos.h);
+            telemetry.addData("X coordinate", pos.x);
+            telemetry.addData("Y coordinate", pos.y);
+            telemetry.addData("Heading angle", pos.z);
+            telemetry.addData("Target", "X %5.2f, Y %5.2f", drive, strafe);
+            telemetry.update();
+        }
+        moveRobotAbsolute(0, 0, 0);
+    }
+
+    public boolean tolerancePointCompare(Vec3 pointA, Vec3 pointB, double tolerance) {
+        double diffX = Math.abs(pointA.x - pointB.x);
+        double diffY = Math.abs(pointA.y - pointB.y);
+
+        return diffX <= tolerance && diffY <= tolerance;
+    }
+
+    public double[] normalizeDirection(Vec3 vec) {
+        double length = Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
+        if (length == 0) {
+            return new double[] {0, 0}; // or handle zero vector case as needed
+        }
+        return new double[] {vec.x / length, vec.y / length, 0};
+    }
+
     public void calculateAprilTagOffset() {
 
     }
@@ -286,6 +370,8 @@ public class JohnBot_MockAuto extends LinearOpMode {
     }
 
     private void configureOtos() {
+
+        myOtos.setSignalProcessConfig(new SparkFunOTOS.SignalProcessConfig((byte) 0x0D));
         telemetry.addLine("Configuring OTOS...");
         telemetry.update();
 
@@ -297,7 +383,7 @@ public class JohnBot_MockAuto extends LinearOpMode {
         // myOtos.setLinearUnit(DistanceUnit.METER);
         myOtos.setLinearUnit(DistanceUnit.INCH);
         // myOtos.setAngularUnit(AnguleUnit.RADIANS);
-        myOtos.setAngularUnit(AngleUnit.DEGREES);
+        myOtos.setAngularUnit(AngleUnit.RADIANS);
 
         // Assuming you've mounted your sensor to a robot and it's not centered,
         // you can specify the offset for the sensor relative to the center of the
@@ -310,7 +396,7 @@ public class JohnBot_MockAuto extends LinearOpMode {
         // clockwise (negative rotation) from the robot's orientation, the offset
         // would be {-5, 10, -90}. These can be any value, even the angle can be
         // tweaked slightly to compensate for imperfect mounting (eg. 1.3 degrees).
-        SparkFunOTOS.Pose2D offset = new SparkFunOTOS.Pose2D(4.5, 0, 0);
+        SparkFunOTOS.Pose2D offset = new SparkFunOTOS.Pose2D(5.6, 0, 0);
         myOtos.setOffset(offset);
 
         // Here we can set the linear and angular scalars, which can compensate for
@@ -360,11 +446,6 @@ public class JohnBot_MockAuto extends LinearOpMode {
         SparkFunOTOS.Version fwVersion = new SparkFunOTOS.Version();
         myOtos.getVersionInfo(hwVersion, fwVersion);
 
-        telemetry.addLine("OTOS configured! Press start to get position data!");
-        telemetry.addLine();
-        telemetry.addLine(String.format("OTOS Hardware Version: v%d.%d", hwVersion.major, hwVersion.minor));
-        telemetry.addLine(String.format("OTOS Firmware Version: v%d.%d", fwVersion.major, fwVersion.minor));
-        telemetry.update();
     }
 }
 

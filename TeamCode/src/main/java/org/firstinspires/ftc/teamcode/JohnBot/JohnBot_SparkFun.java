@@ -47,7 +47,6 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -102,7 +101,6 @@ import java.util.List;
  */
 
 @TeleOp(name = "Spark John", group = "Johnny Boy")
-@Disabled
 public class JohnBot_SparkFun extends LinearOpMode {
     // Adjust these numbers to suit your robot.
     final double DESIRED_DISTANCE = 3.0; //  this is how close the camera should get to the target (inches)
@@ -120,7 +118,7 @@ public class JohnBot_SparkFun extends LinearOpMode {
 
     final double DRIVE_TO_SPEED_MOD = 0.25;
 
-    final double vectorTolerance = 0.5; // How close a vectors components must be to be considered equal
+    final double vectorTolerance = 0.7; // How close a vectors components must be to be considered equal
 
     private DcMotor leftFrontDrive = null;  //  Used to control the left front drive wheel
     private DcMotor rightFrontDrive = null;  //  Used to control the right front drive wheel
@@ -164,7 +162,7 @@ public class JohnBot_SparkFun extends LinearOpMode {
         // Adjust the orientation parameters to match your robot
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+                RevHubOrientationOnRobot.UsbFacingDirection.LEFT));
         // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
         imu.initialize(parameters);
 
@@ -249,6 +247,8 @@ public class JohnBot_SparkFun extends LinearOpMode {
                 telemetry.addData("Limelight", "No data available");
             }
 
+            // 26, 45, 15
+
             double yaw = 0;
             double range = 0;
             double bearing = 0;
@@ -325,7 +325,13 @@ public class JohnBot_SparkFun extends LinearOpMode {
             }
 
             // Apply desired axes motions to the drivetrain.
-            moveRobot(drive, strafe, turn);
+            //moveRobot(drive, strafe, turn);
+            //moveRobot(drive, strafe, turn);
+
+            double y = -gamepad1.left_stick_y;
+            double x = gamepad1.left_stick_x;
+            double rx = gamepad1.right_stick_x;
+            moveRobotAbsolute(x, y, rx);
             sleep(10);
         }
         limelight.stop();
@@ -384,7 +390,7 @@ public class JohnBot_SparkFun extends LinearOpMode {
      * <p>
      * Positive Yaw is counter-clockwise
      */
-    public void moveRobotAbsolute(double x, double y, double yaw, double rx) {
+    public void moveRobotAbsolute(double x, double y, double rx) {
         // Calculate wheel powers.
 
         double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
@@ -445,7 +451,7 @@ public class JohnBot_SparkFun extends LinearOpMode {
             double drive = data[0] * DRIVE_TO_SPEED_MOD;
             double strafe = -data[1] * DRIVE_TO_SPEED_MOD;
             double turn = data[2] * DRIVE_TO_SPEED_MOD;
-            moveRobotAbsolute(strafe, drive, pos.h, turn);
+            moveRobotAbsolute(strafe, drive, turn);
 
             pos = myOtos.getPosition();
             telemetry.addData("X coordinate", pos.x);
@@ -465,7 +471,10 @@ public class JohnBot_SparkFun extends LinearOpMode {
 
     public double[] normalizeDirection(SparkFunOTOS.Pose2D vec) {
         double length = Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
-        return new double[] {vec.x/length, vec.y/length, 0};
+        if (length == 0) {
+            return new double[] {0, 0}; // or handle zero vector case as needed
+        }
+        return new double[] {vec.x / length, vec.y / length};
     }
 
     public void calculateAprilTagOffset() {
