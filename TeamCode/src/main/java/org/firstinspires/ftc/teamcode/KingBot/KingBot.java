@@ -24,7 +24,7 @@ public class KingBot extends LinearOpMode {
     final int MIN_EXTENT_VERT_ENCODERS = 0;
     final double VERT_POWER = 0.5;
 
-    final int MIN_EXTENT_HORI_ENCODERS = (int) (12 * CM_TO_ENCODER_FACTOR);
+    final int MIN_EXTENT_HORI_ENCODERS = 0;
     final double FULL_EXTENT_HORI_CM = 62;
     final int FULL_EXTENT_HORI_ENCODERS = (int) (FULL_EXTENT_HORI_CM * CM_TO_ENCODER_FACTOR);
     final double HORI_POWER = 0.5;
@@ -49,7 +49,6 @@ public class KingBot extends LinearOpMode {
     Servo intake;
     Servo flipper;
     Servo swing;
-    Servo roof;
 
     IMU imu;
 
@@ -67,7 +66,6 @@ public class KingBot extends LinearOpMode {
         intake = hardwareMap.servo.get("intake");
         flipper = hardwareMap.servo.get("flipper");
         swing = hardwareMap.servo.get("swing");
-        roof = hardwareMap.servo.get("roof");
 
         imu = hardwareMap.get(IMU.class, "imu");
 
@@ -145,14 +143,6 @@ public class KingBot extends LinearOpMode {
                 swing.setPosition(0);
             }
 
-            // Open
-            if (gamepad1.left_bumper) {
-                roof.setPosition(0);
-            }
-            // Close
-            if (gamepad1.right_bumper) {
-                roof.setPosition(1);
-            }
 
             if (gamepad2.right_bumper) {
                 flipper.setPosition(1);
@@ -172,20 +162,7 @@ public class KingBot extends LinearOpMode {
                 runMotorToEncoderPosition(vertSlide, MIN_EXTENT_VERT_ENCODERS, -VERT_POWER);
             }*/
 
-            if (gamepad2.x) {
-                runMotorToEncoderPosition(horiSlide, -FULL_EXTENT_HORI_ENCODERS, -HORI_POWER);
-            }
-            if (gamepad2.a)
-            {
-                runMotorToEncoderPosition(horiSlide, MIN_EXTENT_HORI_ENCODERS, HORI_POWER);
-            }
-
-            /** ENCODER STOPS FOR ECCENTRIC DESIGNS **/
-/*            while (horiSlide.getCurrentPosition() > HORI_BOUNDS_ENCODERS[1]) {
-                horiSlide.setPower(HORI_POWER);
-            }
-            horiSlide.setPower(hori_power);*/
-
+            telemetry.addData("Encoder: ", vertSlide.getCurrentPosition());
             telemetry.update();
 
             if (gamepad1.x) {
@@ -257,8 +234,8 @@ public class KingBot extends LinearOpMode {
 
 
     public void runMotorToEncoderPosition(DcMotor motor, int position, double power) {
-        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         motor.setTargetPosition(position);
+        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         motor.setPower(power);
         while (motor.isBusy() && opModeIsActive()) {
             telemetry.addData("Name: ", motor.getPortNumber());
@@ -266,13 +243,10 @@ public class KingBot extends LinearOpMode {
             telemetry.update();
         }
         motor.setPower(0);
-        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
     public void scoreInitiate() {
-
-        roof.setPosition(0.9);
-        sleep(250);
 
         swing.setPosition(1.1);
         sleep(250);
@@ -296,9 +270,6 @@ public class KingBot extends LinearOpMode {
 
         swing.setPosition(0);
         sleep(2000);
-
-        roof.setPosition(0);
-        sleep(250);
 
         sleep(250);
         swing.setPosition(1);
