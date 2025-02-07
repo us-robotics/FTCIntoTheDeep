@@ -143,7 +143,7 @@ public class KingBot_Auto_RedPark extends LinearOpMode {
     IMU imu;
     private SparkFunOTOS myOtos = null;
 
-    final double DRIVE_TIMEOUT = 10000; // 10 seconds
+    final double DRIVE_TIMEOUT = 6000; // 10 seconds
 
     // AUTO POSITIONS
     final double EXTENT_X = -42; // Forward

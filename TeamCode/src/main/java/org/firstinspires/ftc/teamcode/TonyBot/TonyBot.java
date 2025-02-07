@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.TonyBot;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -13,6 +14,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 // Uses Field Centric Controlling
 // The forward direction is defined as the FORWARD when the bot initializes
 @TeleOp(name = "Tony Bot (Field Centric)", group = "Linear OpMode")
+@Disabled
 public class TonyBot extends LinearOpMode {
 
     @Override

@@ -27,30 +27,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * SWEENEY MODIFICATIONS
- * 9/25/24 - switched the motor power (in move robot) to negative, because 24885-bot needed it
- */
-
-package org.firstinspires.ftc.teamcode.JohnBot;
-
-/**
- * SWEENEY MODIFICATIONS
- * 9/25/24 - switched the motor power (in move robot) to negative, because 24885-bot needed it
- * 9/25/24 - integrated the Limelight code from SweeneySensorLimelight3A
- * (and disabled the old webcam code)
- */
+package org.firstinspires.ftc.teamcode.KingBot;
 
 
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -97,9 +83,19 @@ import org.firstinspires.ftc.teamcode.Vec3;
  *
  */
 
-@TeleOp(name = "JohnBot Mock Auto", group = "Linear Opmode")
-@Disabled
-public class JohnBot_MockAuto extends LinearOpMode {
+@TeleOp(name = "KB Auto (White Park & Basket)", group = "Linear Opmode")
+public class KingBot_Auto_WhitePark_Basket extends LinearOpMode {
+    final double VERT_ENCODER_RESOLUTION = 537.7;
+    final double VERT_GEAR_RADIUS = 3.82; // cm
+    final double CM_TO_ENCODER_FACTOR = VERT_ENCODER_RESOLUTION/(2*Math.PI * VERT_GEAR_RADIUS); // cm * THIS = encoder position
+
+    final double FULL_EXTENT_VERT_CM = 30;
+    final double SMALL_EXTENT_VERT_CM = 5;
+    final int FULL_EXTENT_VERT_ENCODERS = (int) (FULL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
+    final int SMALL_EXTENT_VERT_ENCODERS = (int) (SMALL_EXTENT_VERT_CM * CM_TO_ENCODER_FACTOR);
+    final int MIN_EXTENT_VERT_ENCODERS = 0;
+    final double VERT_POWER = 0.5;
+
     // Adjust these numbers to suit your robot.
     final double DESIRED_DISTANCE = 3.0; //  this is how close the camera should get to the target (inches)
 
@@ -117,26 +113,36 @@ public class JohnBot_MockAuto extends LinearOpMode {
     final double DRIVE_TO_SPEED_MOD = 0.4;
 
     final double vectorTolerance = 1; // How close a vectors components must be to be considered equal
+    // Value of 1 means 1 inch margin of error for each direction x & y (SparkFun sensor)
 
-    private DcMotor leftFrontDrive = null;  //  Used to control the left front drive wheel
-    private DcMotor rightFrontDrive = null;  //  Used to control the right front drive wheel
-    private DcMotor leftBackDrive = null;  //  Used to control the left back drive wheel
-    private DcMotor rightBackDrive = null;  //  Used to control the right back drive wheel
+    // Declare our motors
+    // Make sure your ID's match your configuration
+    DcMotor frontLeftMotor;
+    DcMotor backLeftMotor;
+    DcMotor frontRightMotor;
+    DcMotor backRightMotor;
+
+    DcMotor vertSlide;
+    DcMotor horiSlide;
+
+    Servo intake;
+    Servo swing;
+
+    IMU imu;
     private SparkFunOTOS myOtos = null;
 
-    //    private static final boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
-    private static final int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
-    //    private VisionPortal visionPortal;               // Used to manage the video source.
-//    private AprilTagProcessor aprilTag;              // Used for managing the AprilTag detection process.
-    private LLResultTypes.FiducialResult desiredTag = null;     // Used to hold the data for a detected AprilTag
-
-    private Limelight3A limelight;
-
-    IMU imu = null;
+    final double DRIVE_TIMEOUT = 10000; // 10 seconds
 
     // AUTO POSITIONS
-    final double PARK_X = 20;
-    final double PARK_Y = 45;
+    final double EXTENT_X = -42; // Forward
+    final double MID_X = -15;
+    final double MIN_X = -5; // Back up accounting for sample blocking
+    final double Y_1 = -6;
+    final double Y_2 = -15;
+    final double Y_3 = -22;
+    final double MAX_Y = 80;
+
+    final int sleepTime = 500; // ms
 
     @Override
     public void runOpMode() {
@@ -148,66 +154,85 @@ public class JohnBot_MockAuto extends LinearOpMode {
         // Initialize the Apriltag Detection process
         // initAprilTag();
 
-        // Initialize the hardware variables. Note that the strings used here as parameters
-        // to 'get' must match the names assigned during the robot configuration.
-        // step (using the FTC Robot Controller app on the phone).
-        leftFrontDrive = hardwareMap.get(DcMotor.class, "left_front_drive");
-        rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
-        leftBackDrive = hardwareMap.get(DcMotor.class, "left_back_drive");
-        rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
+        frontLeftMotor = hardwareMap.dcMotor.get("left_front_drive");
+        backLeftMotor = hardwareMap.dcMotor.get("left_back_drive");
+        frontRightMotor = hardwareMap.dcMotor.get("right_front_drive");
+        backRightMotor = hardwareMap.dcMotor.get("right_back_drive");
 
-        myOtos = hardwareMap.get(SparkFunOTOS.class, "sensor_otos");
+        vertSlide = hardwareMap.dcMotor.get("vert");
+        horiSlide = hardwareMap.dcMotor.get("hori");
 
+        intake = hardwareMap.servo.get("roof");
+        swing = hardwareMap.servo.get("swing");
 
-        // Retrieve the IMU from the hardware map
         imu = hardwareMap.get(IMU.class, "imu");
-        // Adjust the orientation parameters to match your robot
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+                RevHubOrientationOnRobot.UsbFacingDirection.RIGHT));
         // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
         imu.initialize(parameters);
 
+        // Reverse the right side motors. This may be wrong for your setup.
+        // If your robot moves backwards when commanded to go forwards,
+        // reverse the left side instead.
+        // See the note about this earlier on this page.
+        frontLeftMotor.setDirection(DcMotor.Direction.FORWARD);
+        backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+        frontRightMotor.setDirection(DcMotor.Direction.FORWARD);
+        backRightMotor.setDirection(DcMotor.Direction.REVERSE);
+
+        vertSlide.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        vertSlide.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        myOtos = hardwareMap.get(SparkFunOTOS.class, "sensor_otos");
         configureOtos();
-
-        // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
-        // When run, this OpMode should start both motors driving forward. So adjust these two lines based on your first test drive.
-        // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
-        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
-
-        /**
-         * INITIALIZE LIMELIGHT CAMERA
-         */
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-
-        telemetry.setMsTransmissionInterval(11);
-
-        limelight.pipelineSwitch(1);
-
-        /*
-         * Starts polling for data.  If you neglect to call start(), getLatestResult() will return null.
-         */
-        limelight.start();
 
         telemetry.addData(">", "Robot Ready.  Press Play.");
         telemetry.update();
         waitForStart();
 
-        Vec3 target = new Vec3(PARK_X, 0, 0);
+        runMotorToEncoderPosition(vertSlide, -SMALL_EXTENT_VERT_ENCODERS, VERT_POWER);
+
+        // Move forward
+        Vec3 target = new Vec3(EXTENT_X, 0, 0);
         driveToPoint(target);
 
-        sleep(5000);
+        // Score yellows
+        collectPiece(Y_1, -5, 0); // Move to right-most yellow
+        sleep(sleepTime);
+        collectPiece(Y_2,0, 0); // Move to center yellow
+        sleep(sleepTime);
+        collectPiece(Y_3,5, -5); // Move to left-most yellow
+        sleep(sleepTime);
 
-        target = new Vec3(PARK_X, PARK_Y, 0);
+        // Score Basket
+        target = new Vec3(MIN_X - 5, Y_2, 0);
         driveToPoint(target);
+        sleep(250);
 
-        sleep(5000);
+        runMotorToEncoderPosition(vertSlide, -FULL_EXTENT_VERT_ENCODERS, VERT_POWER);
+        swing.setPosition(1);
+        sleep(1000);
+        intake.setPosition(1);
+        sleep(1000);
+        swing.setPosition(0);
+        sleep(1000);
+        runMotorToEncoderPosition(vertSlide, MIN_EXTENT_VERT_ENCODERS, -VERT_POWER);
 
-        target = new Vec3(5, PARK_Y, 0);
+        target = new Vec3(MIN_X - 5, Y_2, 180);
         driveToPoint(target);
+        sleep(1000);
+
+        // Mid Left
+        target = new Vec3(EXTENT_X, Y_3, 0);
+        driveToPoint(target);
+        sleep(250);
+
+        // Park
+        target = new Vec3(EXTENT_X-3, 8, 0);
+        driveToPoint(target);
+        sleep(sleepTime);
 
         SparkFunOTOS.Pose2D pos = myOtos.getPosition();
 
@@ -215,8 +240,19 @@ public class JohnBot_MockAuto extends LinearOpMode {
         telemetry.addData("Y coordinate", pos.y);
         telemetry.addData("Heading angle", pos.h);
 
-        limelight.stop();
+    }
 
+    public void collectPiece(double y, double y_offset, double x_offset) {
+        // Move to right-most yellow
+        Vec3 target = new Vec3(EXTENT_X, y, 0);
+        driveToPoint(target);
+        sleep(250);
+        target = new Vec3(MIN_X + x_offset, y + y_offset, 0);
+        driveToPoint(target);
+        sleep(250);
+        target = new Vec3(EXTENT_X, y, 0);
+        driveToPoint(target);
+        sleep(250);
     }
 
     /**
@@ -256,10 +292,10 @@ public class JohnBot_MockAuto extends LinearOpMode {
         }
 
         // Send powers to the wheels.
-        leftFrontDrive.setPower(leftFrontPower);
-        rightFrontDrive.setPower(rightFrontPower);
-        leftBackDrive.setPower(leftBackPower);
-        rightBackDrive.setPower(rightBackPower);
+        frontLeftMotor.setPower(leftFrontPower);
+        frontRightMotor.setPower(rightFrontPower);
+        backLeftMotor.setPower(leftBackPower);
+        backRightMotor.setPower(rightBackPower);
     }
 
     /**
@@ -312,17 +348,32 @@ public class JohnBot_MockAuto extends LinearOpMode {
         }
 
         // Send powers to the wheels.
-        leftFrontDrive.setPower(frontLeftPower);
-        rightFrontDrive.setPower(frontRightPower);
-        leftBackDrive.setPower(backLeftPower);
-        rightBackDrive.setPower(backRightPower);
+        frontLeftMotor.setPower(frontLeftPower);
+        frontRightMotor.setPower(frontRightPower);
+        backLeftMotor.setPower(backLeftPower);
+        backRightMotor.setPower(backRightPower);
+    }
+
+    public void runMotorToEncoderPosition(DcMotor motor, int position, double power) {
+        motor.setTargetPosition(position);
+        motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        motor.setPower(power);
+        while (motor.isBusy() && opModeIsActive()) {
+            telemetry.addData("Name: ", motor.getPortNumber());
+            telemetry.addData("Pos: ", motor.getCurrentPosition());
+            telemetry.update();
+        }
+        motor.setPower(0);
+        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
     public void driveToPoint(Vec3 target) {
 
         SparkFunOTOS.Pose2D posOtos = myOtos.getPosition();
         Vec3 pos = new Vec3(posOtos.x, posOtos.y, posOtos.h);
-        while (!tolerancePointCompare(pos, target, vectorTolerance)) {
+        double start = System.currentTimeMillis();
+        double curr = System.currentTimeMillis();
+        while (!tolerancePointCompare(pos, target, vectorTolerance) && (curr-start <= DRIVE_TIMEOUT)) {
             if (gamepad1.y) {
                 break;
             }
@@ -344,6 +395,7 @@ public class JohnBot_MockAuto extends LinearOpMode {
             telemetry.addData("Heading angle", pos.z);
             telemetry.addData("Target", "X %5.2f, Y %5.2f", drive, strafe);
             telemetry.update();
+            curr = System.currentTimeMillis();
         }
         moveRobotAbsolute(0, 0, 0);
     }
@@ -356,11 +408,11 @@ public class JohnBot_MockAuto extends LinearOpMode {
     }
 
     public double[] normalizeDirection(Vec3 vec) {
-        double length = Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
+        double length = Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2) + Math.pow(vec.z, 2));
         if (length == 0) {
-            return new double[] {0, 0}; // or handle zero vector case as needed
+            return new double[] {0, 0, 0}; // or handle zero vector case as needed
         }
-        return new double[] {vec.x / length, vec.y / length, 0};
+        return new double[] {vec.x / length, vec.y / length, vec.z / length};
     }
 
     public void calculateAprilTagOffset() {
@@ -384,7 +436,6 @@ public class JohnBot_MockAuto extends LinearOpMode {
         // OpModes if using the non-default value.
         // myOtos.setLinearUnit(DistanceUnit.METER);
         myOtos.setLinearUnit(DistanceUnit.INCH);
-        // myOtos.setAngularUnit(AnguleUnit.RADIANS);
         myOtos.setAngularUnit(AngleUnit.RADIANS);
 
         // Assuming you've mounted your sensor to a robot and it's not centered,
